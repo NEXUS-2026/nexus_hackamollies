@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Component Risk Monitor — NEXUS AI Industrial Analyser</title>
+  <meta name="description" content="Real-time AI-based industrial component risk monitoring dashboard with live sensor gauges, health scoring, and anomaly detection." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #04080d;
+      --panel: #0b1520;
+      --panel2: #0f1d2e;
+      --border: #162a3e;
+      --border2: #1e3a54;
+      --cyan: #00d4ff;
+      --cyan-dim: rgba(0,212,255,0.12);
+      --cyan-glow: rgba(0,212,255,0.35);
+      --green: #00e5a0;
+      --yellow: #ffcc00;
+      --orange: #ff7a00;
+      --red: #ff2244;
+      --text: #c8dff0;
+      --text-dim: #4a6a85;
+      --text-bright: #e8f4ff;
+      --sidebar-bg: rgba(11,21,32,0.7);
+      --navbar-bg: rgba(4,8,13,0.92);
+      --grid-color: rgba(0,212,255,0.03);
+      --chart-grid: rgba(22,42,62,0.5);
+      --chart-tick: #4a6a85;
+      --log-entry-bg: rgba(255,255,255,0.02);
+      --font-ui: 'Sora', sans-serif;
+      --font-data: 'JetBrains Mono', monospace;
+      --navbar-h: 60px;
+      --sidebar-w: 280px;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --transition: all 0.25s ease;
+    }
+
+    /* ── LIGHT MODE ── */
+    html[data-theme="light"] {
+      --bg: #f0f5fa;
+      --panel: #ffffff;
+      --panel2: #f5f9fe;
+      --border: #d0dff0;
+      --border2: #b8d0e8;
+      --cyan: #007aaa;
+      --cyan-dim: rgba(0,122,170,0.1);
+      --cyan-glow: rgba(0,122,170,0.25);
+      --green: #00875a;
+      --yellow: #c07800;
+      --orange: #b85000;
+      --red: #cc1133;
+      --text: #1a2a3a;
+      --text-dim: #5a7890;
+      --text-bright: #0a1520;
+      --sidebar-bg: rgba(240,245,255,0.95);
+      --navbar-bg: rgba(240,245,255,0.95);
+      --grid-color: rgba(0,100,160,0.04);
+      --chart-grid: rgba(200,220,240,0.8);
+      --chart-tick: #5a7890;
+      --log-entry-bg: rgba(0,0,0,0.03);
+    }
+    html[data-theme="light"] body::before {
+      background-image:
+        linear-gradient(rgba(0,100,160,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,100,160,0.04) 1px, transparent 1px);
+    }
+    html[data-theme="light"] .navbar {
+      background: rgba(240,245,255,0.96) !important;
+      border-bottom-color: var(--border) !important;
+    }
+    html[data-theme="light"] .sidebar {
+      background: rgba(235,242,255,0.9) !important;
+      border-right-color: var(--border) !important;
+    }
+    html[data-theme="light"] .comp-card.active {
+      background: rgba(0,122,170,0.08) !important;
+      box-shadow: 0 0 18px rgba(0,122,170,0.12) !important;
+    }
+    html[data-theme="light"] .comp-card:hover {
+      background: rgba(0,122,170,0.05) !important;
+    }
+    html[data-theme="light"] .health-status.optimal { background: rgba(0,135,90,0.1); border-color: rgba(0,135,90,0.3); }
+    html[data-theme="light"] .health-status.degraded { background: rgba(192,120,0,0.1); border-color: rgba(192,120,0,0.3); }
+    html[data-theme="light"] .health-status.critical { background: rgba(184,80,0,0.1); border-color: rgba(184,80,0,0.3); }
+    html[data-theme="light"] .health-status.fault    { background: rgba(204,17,51,0.1); border-color: rgba(204,17,51,0.3); }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      overflow-x: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* GRID BG */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: var(--navbar-h);
+      background: var(--navbar-bg, rgba(4,8,13,0.92));
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 20px;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .nav-back {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--cyan);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      padding: 7px 14px;
+      border: 1px solid rgba(0,212,255,0.25);
+      border-radius: var(--radius-sm);
+      background: rgba(0,212,255,0.05);
+      cursor: pointer;
+      transition: all 0.22s ease;
+      white-space: nowrap;
+    }
+    .nav-back:hover {
+      background: rgba(0,212,255,0.12);
+      border-color: var(--cyan);
+      box-shadow: 0 0 16px rgba(0,212,255,0.2);
+    }
+    .nav-back svg { flex-shrink: 0; }
+
+    .nav-divider { width: 1px; height: 28px; background: var(--border2); flex-shrink: 0; }
+
+    .nav-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-bright);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .nav-title span { color: var(--cyan); }
+
+    .nav-badge {
+      margin-left: auto;
+      font-family: var(--font-data);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── LAYOUT ── */
+    .layout {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      height: calc(100vh - var(--navbar-h));
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--sidebar-bg, rgba(11,21,32,0.7));
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 20px 14px;
+      gap: 8px;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 0 8px 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .comp-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+      background: transparent;
+      position: relative;
+    }
+    .comp-card:hover {
+      background: rgba(0,212,255,0.04);
+      border-color: var(--border);
+      box-shadow: 0 0 20px rgba(0,212,255,0.08);
+    }
+    .comp-card.active {
+      background: rgba(0,212,255,0.07);
+      border-color: var(--border2);
+      border-left-color: var(--cyan) !important;
+      box-shadow: 0 0 24px rgba(0,212,255,0.15);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .status-dot.ok    { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.warn  { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+    .status-dot.crit  { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+    .comp-info { flex: 1; min-width: 0; }
+    .comp-name {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-bright);
+    }
+    .comp-type {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    .risk-badge {
+      font-family: var(--font-data);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .risk-badge.low  { background: rgba(0,229,160,0.18); color: var(--green); border: 1px solid rgba(0,229,160,0.3); }
+    .risk-badge.med  { background: rgba(255,204,0,0.15); color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
+    .risk-badge.high { background: rgba(255,122,0,0.15); color: var(--orange); border: 1px solid rgba(255,122,0,0.3); }
+    .risk-badge.crit { background: rgba(255,34,68,0.15); color: var(--red); border: 1px solid rgba(255,34,68,0.3); }
+
+    /* ── MAIN AREA ── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
+    }
+    .main::-webkit-scrollbar { width: 4px; }
+    .main::-webkit-scrollbar-track { background: transparent; }
+    .main::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+    /* PLACEHOLDER */
+    .placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      opacity: 0.35;
+    }
+    .placeholder svg { color: var(--cyan); }
+    .placeholder p { font-size: 14px; color: var(--text-dim); text-align: center; }
+
+    /* ── COMPONENT HEADER ── */
+    .comp-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .comp-header-name {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-bright);
+    }
+
+    .comp-type-tag {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--cyan);
+      background: var(--cyan-dim);
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--text-bright);
+      background: rgba(255,34,68,0.12);
+      border: 1px solid rgba(255,34,68,0.3);
+      border-radius: 20px;
+      padding: 5px 12px;
+      margin-left: auto;
+    }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+      animation: pulse-red 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* ── GAUGE GRID ── */
+    .gauge-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .gauge-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.3s;
+    }
+    .gauge-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .gauge-canvas-wrap { position: relative; width: 160px; height: 100px; }
+    .gauge-canvas-wrap canvas { display: block; }
+
+    .gauge-value {
+      font-family: var(--font-data);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-bright);
+      line-height: 1;
+      text-align: center;
+    }
+    .gauge-unit {
+      font-family: var(--font-data);
+      font-size: 13px;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+    .gauge-minmax {
+      display: flex;
+      justify-content: space-between;
+      width: 160px;
+      font-family: var(--font-data);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* ── MIDDLE ROW: HEALTH + CHART ── */
+    .mid-row {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 16px;
+    }
+
+    .health-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+    .health-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .health-ring-wrap {
+      position: relative;
+      width: 160px;
+      height: 160px;
+    }
+    .health-ring-wrap canvas { position: absolute; inset: 0; }
+    .health-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .health-score {
+      font-family: var(--font-data);
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .health-pct {
+      font-family: var(--font-data);
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+    .health-status {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 5px 16px;
+      border-radius: 20px;
+    }
+    .health-status.optimal { background: rgba(0,229,160,0.12); color: var(--green); border: 1px solid rgba(0,229,160,0.3); }
+    .health-status.degraded { background: rgba(255,204,0,0.12); color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
+    .health-status.critical { background: rgba(255,122,0,0.12); color: var(--orange); border: 1px solid rgba(255,122,0,0.3); }
+    .health-status.fault { background: rgba(255,34,68,0.12); color: var(--red); border: 1px solid rgba(255,34,68,0.3); }
+
+    /* CHART PANEL */
+    .chart-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-head-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .chart-wrap { position: relative; height: 180px; }
+
+    /* ── ANOMALY LOG ── */
+    .log-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .log-body {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .log-body::-webkit-scrollbar { width: 3px; }
+    .log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+    .log-entry {
+      font-family: var(--font-data);
+      font-size: 11.5px;
+      padding: 7px 12px;
+      border-radius: 5px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      border-left: 3px solid transparent;
+      background: rgba(255,255,255,0.02);
+      animation: log-in 0.3s ease;
+    }
+    @keyframes log-in {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .log-entry.warn { border-left-color: var(--yellow); }
+    .log-entry.crit { border-left-color: var(--red); }
+    .log-entry.ok   { border-left-color: var(--green); }
+    .log-time { color: var(--text-dim); flex-shrink: 0; }
+    .log-msg.warn { color: var(--yellow); }
+    .log-msg.crit { color: var(--red); }
+    .log-msg.ok   { color: var(--green); }
+
+    /* ── CUSTOM RANGE SLIDER ── */
+    .anomaly-section {
+      padding: 14px 12px 16px;
+      background: rgba(0,212,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 4px;
+    }
+    .anomaly-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .anomaly-section-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .anomaly-val-display {
+      font-family: var(--font-data);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .anomaly-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-data);
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+    .anomaly-descriptor {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 8px;
+      text-align: center;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    input[type="range"]#anomaly-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 4px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    input[type="range"]#anomaly-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan-glow);
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+    }
+    input[type="range"]#anomaly-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+    input[type="range"]#anomaly-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan-glow);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* HIDDEN */
+    .hidden { display: none !important; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 860px) {
+      .layout { flex-direction: column; height: auto; }
+      .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 12px; gap: 8px; overflow-y: visible; }
+      .sidebar-label { display: none; }
+      .comp-card { flex: 1 1 calc(33% - 8px); min-width: 120px; }
+      .main { padding: 16px; }
+      .gauge-grid { grid-template-columns: repeat(3,1fr); gap: 10px; }
+      .mid-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .gauge-grid { grid-template-columns: 1fr; }
+      .comp-card { flex: 1 1 calc(50% - 8px); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+  <a class="nav-back" href="http://localhost:8501">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    Back to Dashboard
+  </a>
+  <div class="nav-divider"></div>
+  <div class="nav-title"><span>NEXUS</span> · COMPONENT RISK MONITOR</div>
+  <div class="nav-badge" id="nav-clock">--:--:--</div>
+  <button id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode"
+    style="margin-left:12px; background:var(--cyan-dim); border:1px solid var(--border2);
+           color:var(--text); border-radius:var(--radius-sm); padding:6px 12px;
+           cursor:pointer; font-family:var(--font-ui); font-size:13px; font-weight:600;
+           display:flex; align-items:center; gap:6px; transition:all 0.2s; white-space:nowrap;">
+    <span id="theme-icon">☀️</span><span id="theme-label">Light</span>
+  </button>
+</nav>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-label">System Components</div>
+    <!-- cards + anomaly control injected by JS -->
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main" id="main-area">
+
+    <!-- PLACEHOLDER -->
+    <div class="placeholder" id="placeholder">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+      </svg>
+      <p>Select a component from the sidebar<br/>to begin live monitoring.</p>
+    </div>
+
+    <!-- DASHBOARD (hidden until component selected) -->
+    <div id="dashboard" class="hidden">
+
+      <!-- HEADER -->
+      <div class="comp-header" id="dash-header">
+        <div>
+          <div class="comp-header-name" id="dash-name">MOTOR</div>
+        </div>
+        <div class="comp-type-tag" id="dash-type">ROTARY MACHINE</div>
+        <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+      </div>
+
+      <!-- GAUGES -->
+      <div class="gauge-grid">
+        <div class="gauge-panel" id="gauge-temp">
+          <div class="gauge-label">TEMPERATURE</div>
+          <div class="gauge-canvas-wrap">
+            <canvas id="canvas-temp" width="160" height="100"></canvas>
+          </div>
+          <div class="gauge-minmax" id="gauge-temp-minmax"><span>-</span><span>-</span></div>
+          <div class="gauge-value" id="val-temp">--<span class="gauge-unit"> °C</span></div>
+        </div>
+        <div class="gauge-panel" id="gauge-pres">
+          <div class="gauge-label">PRESSURE</div>
+          <div class="gauge-canvas-wrap">
+            <canvas id="canvas-pres" width="160" height="100"></canvas>
+          </div>
+          <div class="gauge-minmax" id="gauge-pres-minmax"><span>-</span><span>-</span></div>
+          <div class="gauge-value" id="val-pres">--<span class="gauge-unit"> bar</span></div>
+        </div>
+        <div class="gauge-panel" id="gauge-vib">
+          <div class="gauge-label">VIBRATION</div>
+          <div class="gauge-canvas-wrap">
+            <canvas id="canvas-vib" width="160" height="100"></canvas>
+          </div>
+          <div class="gauge-minmax" id="gauge-vib-minmax"><span>-</span><span>-</span></div>
+          <div class="gauge-value" id="val-vib">--<span class="gauge-unit"> mm/s</span></div>
+        </div>
+      </div>
+
+      <!-- MIDDLE ROW -->
+      <div class="mid-row">
+        <!-- HEALTH -->
+        <div class="health-panel">
+          <div class="health-title">System Health</div>
+          <div class="health-ring-wrap">
+            <canvas id="canvas-health" width="160" height="160"></canvas>
+            <div class="health-center">
+              <div class="health-score" id="health-score-val">--</div>
+              <div class="health-pct">/ 100</div>
+            </div>
+          </div>
+          <div class="health-status optimal" id="health-status-label">OPTIMAL</div>
+        </div>
+
+        <!-- LIVE CHART -->
+        <div class="chart-panel">
+          <div class="panel-head">
+            <div class="panel-head-title">Live Condition — 30s Window</div>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>Temp</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#00e5a0"></div>Pressure</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div>Vibration</div>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="live-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANOMALY LOG -->
+      <div class="log-panel">
+        <div class="panel-head">
+          <div class="panel-head-title">Anomaly Log</div>
+          <div style="font-family:var(--font-data);font-size:10px;color:var(--text-dim);">LAST 8 EVENTS</div>
+        </div>
+        <div class="log-body" id="log-body"></div>
+      </div>
+
+    </div><!-- /dashboard -->
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  ANOMALY RATIO SLIDER
+// ═══════════════════════════════════════════════════════
+window.anomalyRatio = 0.15; // default 15%
+
+function onAnomalySlider(rawVal) {
+  const pct = parseInt(rawVal, 10);
+  window.anomalyRatio = pct / 100;
+
+  // Update display
+  document.getElementById('anomaly-display').textContent = pct + '%';
+
+  // Color + descriptor
+  let color, desc;
+  if (pct === 0)       { color = 'var(--green)';  desc = 'NONE \u2014 FULLY STABLE'; }
+  else if (pct <= 15)  { color = 'var(--green)';  desc = 'LOW \u2014 RARE SPIKES'; }
+  else if (pct <= 35)  { color = 'var(--yellow)'; desc = 'MODERATE \u2014 OCCASIONAL'; }
+  else if (pct <= 60)  { color = 'var(--orange)'; desc = 'HIGH \u2014 FREQUENT'; }
+  else                 { color = 'var(--red)';     desc = 'CRITICAL \u2014 CONSTANT FAULTS'; }
+
+  document.getElementById('anomaly-display').style.color = color;
+  const descEl = document.getElementById('anomaly-desc');
+  descEl.textContent = desc;
+  descEl.style.color = color;
+
+  // Gradient track fill
+  const slider = document.getElementById('anomaly-slider');
+  slider.style.background =
+    `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, var(--border) ${pct}%, var(--border) 100%)`;
+}
+
+// Init on page load
+window.addEventListener('DOMContentLoaded', () => onAnomalySlider(15));
+
+// ═══════════════════════════════════════════════════════
+//  COMPONENT DEFINITIONS
+// ═══════════════════════════════════════════════════════
+const COMPONENTS = {
+  MOTOR: {
+    type: 'Rotary Machine',
+    temp:  { min: 60,  max: 130, safe: 90,  warn: 110 },
+    pres:  { min: 1,   max: 5,   safe: 3.5, warn: 4.5 },
+    vib:   { min: 0,   max: 10,  safe: 6,   warn: 8   },
+  },
+  PUMP: {
+    type: 'Fluid System',
+    temp:  { min: 40,  max: 90,  safe: 65,  warn: 80  },
+    pres:  { min: 2,   max: 12,  safe: 8,   warn: 10.5},
+    vib:   { min: 0,   max: 8,   safe: 5,   warn: 7   },
+  },
+  COMPRESSOR: {
+    type: 'Gas System',
+    temp:  { min: 50,  max: 150, safe: 100, warn: 130 },
+    pres:  { min: 5,   max: 25,  safe: 17,  warn: 22  },
+    vib:   { min: 0,   max: 15,  safe: 9,   warn: 12  },
+  },
+  'HEAT EXCHANGER': {
+    type: 'Thermal Unit',
+    temp:  { min: 30,  max: 200, safe: 130, warn: 170 },
+    pres:  { min: 1,   max: 8,   safe: 5.5, warn: 7   },
+    vib:   { min: 0,   max: 3,   safe: 1.8, warn: 2.5 },
+  },
+  TURBINE: {
+    type: 'Power Drive',
+    temp:  { min: 80,  max: 400, safe: 260, warn: 340 },
+    pres:  { min: 10,  max: 50,  safe: 34,  warn: 44  },
+    vib:   { min: 0,   max: 20,  safe: 12,  warn: 16  },
+  },
+  GENERATOR: {
+    type: 'Electrical Unit',
+    temp:  { min: 50,  max: 110, safe: 78,  warn: 95  },
+    pres:  { min: 1,   max: 3,   safe: 2.1, warn: 2.7 },
+    vib:   { min: 0,   max: 12,  safe: 7.5, warn: 10  },
+  },
+};
+
+const COMP_NAMES = Object.keys(COMPONENTS);
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let activeComp = null;
+let liveChart = null;
+let liveInterval = null;
+let sidebarCards = {};
+let tick = 0;
+let logEntries = [];
+
+// Sidebar risk cache (for badges / status dots)
+let compRisk = {};
+COMP_NAMES.forEach(n => { compRisk[n] = { score: 85, level: 'low' }; });
+
+// ═══════════════════════════════════════════════════════
+//  LIGHT / DARK THEME TOGGLE
+// ═══════════════════════════════════════════════════════
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (theme === 'light') {
+    icon.textContent  = '🌙';
+    label.textContent = 'Dark';
+  } else {
+    icon.textContent  = '☀️';
+    label.textContent = 'Light';
+  }
+  localStorage.setItem('nexus-theme', theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// Init theme from localStorage
+(function() {
+  const saved = localStorage.getItem('nexus-theme') || 'dark';
+  applyTheme(saved);
+})();
+
+// ═══════════════════════════════════════════════════════
+//  SIDEBAR BUILD
+// ═══════════════════════════════════════════════════════
+function buildSidebar() {
+  const sb = document.getElementById('sidebar');
+  const label = sb.querySelector('.sidebar-label');
+  const anomalyBlock = createAnomalyBlock();
+  sb.innerHTML = '';
+  sb.appendChild(label);
+
+  COMP_NAMES.forEach(name => {
+    const card = document.createElement('div');
+    card.className = 'comp-card';
+    card.id = `card-${name.replace(/\s/g,'-')}`;
+    card.innerHTML = `
+      <div class="status-dot ok" id="dot-${name.replace(/\s/g,'-')}"></div>
+      <div class="comp-info">
+        <div class="comp-name">${name}</div>
+        <div class="comp-type">${COMPONENTS[name].type}</div>
+      </div>
+      <div class="risk-badge low" id="badge-${name.replace(/\s/g,'-')}">LOW</div>
+    `;
+    card.addEventListener('click', () => selectComponent(name));
+    sb.appendChild(card);
+    sidebarCards[name] = card;
+  });
+
+  // Anomaly slider always at the bottom
+  sb.appendChild(anomalyBlock);
+  // Re-apply slider visuals after injecting into DOM
+  onAnomalySlider(Math.round((window.anomalyRatio ?? 0.15) * 100));
+}
+
+function createAnomalyBlock() {
+  const wrap = document.createElement('div');
+  wrap.className = 'anomaly-section';
+  wrap.innerHTML = `
+    <div class="anomaly-section-header">
+      <span class="anomaly-section-title">⚠️ Anomaly Ratio</span>
+      <span class="anomaly-val-display" id="anomaly-display">15%</span>
+    </div>
+    <input type="range" id="anomaly-slider"
+           min="0" max="100" value="${Math.round((window.anomalyRatio ?? 0.15) * 100)}" step="1"
+           oninput="onAnomalySlider(this.value)" />
+    <div class="anomaly-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+    <div class="anomaly-descriptor" id="anomaly-desc">LOW — RARE SPIKES</div>
+  `;
+  return wrap;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SELECT COMPONENT
+// ═══════════════════════════════════════════════════════
+function selectComponent(name) {
+  if (activeComp === name) return;
+  activeComp = name;
+
+  // update cards
+  COMP_NAMES.forEach(n => sidebarCards[n].classList.remove('active'));
+  sidebarCards[name].classList.add('active');
+
+  // show dashboard
+  document.getElementById('placeholder').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+
+  // reset
+  document.getElementById('dash-name').textContent = name;
+  document.getElementById('dash-type').textContent = COMPONENTS[name].type.toUpperCase();
+
+  // gauge labels
+  const c = COMPONENTS[name];
+  setMinMax('gauge-temp-minmax', c.temp.min, c.temp.max);
+  setMinMax('gauge-pres-minmax', c.pres.min, c.pres.max);
+  setMinMax('gauge-vib-minmax',  c.vib.min,  c.vib.max);
+
+  // reset log
+  logEntries = [];
+  prevState  = { temp: 'ok', pres: 'ok', vib: 'ok' };
+  nominalTick = 0;
+  resetSpikes();
+  document.getElementById('log-body').innerHTML = '';
+
+  // rebuild chart
+  initChart();
+
+  // clear old interval
+  if (liveInterval) clearInterval(liveInterval);
+  tick = 0;
+  liveInterval = setInterval(updateDashboard, 1500);
+  updateDashboard();
+}
+
+function setMinMax(id, min, max) {
+  const el = document.getElementById(id);
+  el.children[0].textContent = min;
+  el.children[1].textContent = max;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SIMULATION — organic noise + spike events
+// ═══════════════════════════════════════════════════════
+
+// Spike state: tracks active spike for each sensor
+let spikes = { temp: null, pres: null, vib: null };
+
+function resetSpikes() {
+  spikes = { temp: null, pres: null, vib: null };
+}
+
+function maybeStartSpike(sensor) {
+  if (spikes[sensor]) return; // already spiking
+  const prob = window.anomalyRatio ?? 0.15;
+  if (Math.random() < prob) {
+    const isCrit = Math.random() < 0.3; // 30% chance it's critical, else warning
+    spikes[sensor] = {
+      target: isCrit ? 'crit' : 'warn',
+      remaining: Math.floor(3 + Math.random() * 5), // lasts 3-8 ticks
+    };
+  }
+}
+
+function simulateSensor(range, t, freq, sensor) {
+  // Base organic value: sine around safe zone (60% of range), not midpoint
+  const safeCenter = range.min + (range.safe - range.min) * 0.5;
+  const safeHalf   = (range.safe - range.min) * 0.38;
+  const base = safeCenter + Math.sin(t * freq) * safeHalf + (Math.random() - 0.5) * safeHalf * 0.12;
+
+  // Check if spike is active
+  const spike = spikes[sensor];
+  if (spike) {
+    spike.remaining--;
+    if (spike.remaining <= 0) spikes[sensor] = null; // spike ends
+
+    // Push value into warning or critical zone
+    const lo  = spike.target === 'crit' ? range.max * 0.93 : range.warn;
+    const hi  = spike.target === 'crit' ? range.max         : range.max * 0.92;
+    const spikeVal = lo + Math.random() * (hi - lo);
+    return clamp(spikeVal, range.min, range.max);
+  }
+
+  // Occasionally trigger a new spike next tick
+  maybeStartSpike(sensor);
+
+  return clamp(base, range.min, range.safe * 0.98); // normal ops stay under safe
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function getSensorValues() {
+  if (!activeComp) return null;
+  const c = COMPONENTS[activeComp];
+  const t = tick * 0.12;
+  return {
+    temp: simulateSensor(c.temp, t, 0.37, 'temp'),
+    pres: simulateSensor(c.pres, t, 0.52, 'pres'),
+    vib:  simulateSensor(c.vib,  t, 0.71, 'vib'),
+  };
+}
+
+// health score
+function calcHealth(vals) {
+  if (!activeComp || !vals) return 100;
+  const c = COMPONENTS[activeComp];
+  const score = (sensorScore(vals.temp, c.temp) * 0.4) +
+                (sensorScore(vals.pres, c.pres) * 0.3) +
+                (sensorScore(vals.vib,  c.vib)  * 0.3);
+  return Math.round(score);
+}
+
+function sensorScore(val, range) {
+  // 100 if under safe, linear drop to 0 at max
+  if (val <= range.safe) return 100;
+  if (val >= range.max)  return 0;
+  const danger = range.max - range.safe;
+  return 100 * (1 - (val - range.safe) / danger);
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAW GAUGE
+// ═══════════════════════════════════════════════════════
+function drawGauge(canvasId, val, range, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 160, H = 100;
+  const cx = W / 2, cy = H - 10;
+  const r = 72;
+  const startA = Math.PI, endA = 2 * Math.PI;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Track
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startA, endA);
+  ctx.strokeStyle = 'rgba(22,42,62,0.9)';
+  ctx.lineWidth = 10;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Fill
+  const fraction = clamp((val - range.min) / (range.max - range.min), 0, 1);
+  const fillEnd = startA + fraction * Math.PI;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startA, fillEnd);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 10;
+  ctx.lineCap = 'round';
+  ctx.shadowBlur = 14;
+  ctx.shadowColor = color;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Tick marks (minor)
+  for (let i = 0; i <= 10; i++) {
+    const a = startA + (i / 10) * Math.PI;
+    const len = (i % 5 === 0) ? 8 : 4;
+    const x1 = cx + (r + 12) * Math.cos(a);
+    const y1 = cy + (r + 12) * Math.sin(a);
+    const x2 = cx + (r + 12 - len) * Math.cos(a);
+    const y2 = cy + (r + 12 - len) * Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = 'rgba(74,106,133,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function gaugeColor(val, range) {
+  const f = (val - range.min) / (range.max - range.min);
+  if (f < 0.5) return '#00e5a0';
+  if (f < 0.72) return '#ffcc00';
+  if (f < 0.88) return '#ff7a00';
+  return '#ff2244';
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAW HEALTH RING
+// ═══════════════════════════════════════════════════════
+function drawHealthRing(score) {
+  const canvas = document.getElementById('canvas-health');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 160, H = 160, cx = 80, cy = 80, r = 68;
+  ctx.clearRect(0, 0, W, H);
+
+  // Track
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, -Math.PI/2, 3*Math.PI/2);
+  ctx.strokeStyle = 'rgba(22,42,62,0.9)';
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Color
+  let color;
+  if (score >= 80)      color = '#00e5a0';
+  else if (score >= 50) color = '#ffcc00';
+  else if (score >= 25) color = '#ff7a00';
+  else                  color = '#ff2244';
+
+  const end = -Math.PI/2 + (score/100) * 2 * Math.PI;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, -Math.PI/2, end);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = color;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // score text color
+  const scoreEl = document.getElementById('health-score-val');
+  scoreEl.textContent = score;
+  scoreEl.style.color = color;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CHART
+// ═══════════════════════════════════════════════════════
+const MAX_POINTS = 20;
+
+function initChart() {
+  if (liveChart) { liveChart.destroy(); liveChart = null; }
+  const ctx = document.getElementById('live-chart').getContext('2d');
+  const labels = Array(MAX_POINTS).fill('');
+  liveChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Temperature', data: Array(MAX_POINTS).fill(null), borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 2, pointRadius: 0, tension: 0.45, fill: true },
+        { label: 'Pressure',    data: Array(MAX_POINTS).fill(null), borderColor: '#00e5a0', backgroundColor: 'rgba(0,229,160,0.04)', borderWidth: 2, pointRadius: 0, tension: 0.45, fill: true },
+        { label: 'Vibration',   data: Array(MAX_POINTS).fill(null), borderColor: '#ffcc00', backgroundColor: 'rgba(255,204,0,0.04)', borderWidth: 2, pointRadius: 0, tension: 0.45, fill: true },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 0 },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: {
+          display: true,
+          grid: { color: 'rgba(22,42,62,0.5)' },
+          ticks: { color: '#4a6a85', font: { family: "'JetBrains Mono'", size: 9 } },
+          border: { color: 'rgba(22,42,62,0.5)' },
+        }
+      }
+    }
+  });
+}
+
+function pushChart(vals) {
+  if (!liveChart) return;
+  const ds = liveChart.data.datasets;
+  ds[0].data.push(+vals.temp.toFixed(1));
+  ds[1].data.push(+vals.pres.toFixed(2));
+  ds[2].data.push(+vals.vib.toFixed(2));
+  if (ds[0].data.length > MAX_POINTS) {
+    ds.forEach(d => d.data.shift());
+  }
+  liveChart.update('none');
+}
+
+// ═══════════════════════════════════════════════════════
+//  ANOMALY LOG — state-change driven
+// ═══════════════════════════════════════════════════════
+function fmtTime(d) {
+  return d.toTimeString().slice(0,8);
+}
+
+// Track previous state per sensor to log only on transitions
+let prevState = { temp: 'ok', pres: 'ok', vib: 'ok' };
+let nominalTick = 0; // controls how often we log a nominal heartbeat
+
+function sensorState(val, range) {
+  if (val >= range.max * 0.93)  return 'crit';
+  if (val >= range.warn)         return 'warn';
+  return 'ok';
+}
+
+function maybeLog(vals) {
+  if (!activeComp) return;
+  const c   = COMPONENTS[activeComp];
+  const now = new Date();
+  let anyAnomaly = false;
+
+  const sensors = [
+    { key: 'temp', val: vals.temp, range: c.temp, unit: '°C',   label: 'Temperature' },
+    { key: 'pres', val: vals.pres, range: c.pres, unit: 'bar',  label: 'Pressure'    },
+    { key: 'vib',  val: vals.vib,  range: c.vib,  unit: 'mm/s', label: 'Vibration'   },
+  ];
+
+  sensors.forEach(({ key, val, range, unit, label }) => {
+    const state = sensorState(val, range);
+    const prev  = prevState[key];
+
+    if (state === 'crit' && prev !== 'crit') {
+      pushLog('crit', `${label} CRITICAL — ${val.toFixed(2)} ${unit} (limit: ${range.max} ${unit})`, now);
+      anyAnomaly = true;
+    } else if (state === 'warn' && prev !== 'warn') {
+      pushLog('warn', `${label} elevated — ${val.toFixed(2)} ${unit} (warn: ${range.warn} ${unit})`, now);
+      anyAnomaly = true;
+    } else if (state === 'ok' && (prev === 'warn' || prev === 'crit')) {
+      // Recovery
+      pushLog('ok', `${label} recovered — ${val.toFixed(2)} ${unit} ✓`, now);
+    } else if (state !== 'ok') {
+      // Still in anomaly — log a reminder every 4 ticks
+      if (tick % 4 === 0) {
+        const sev = state === 'crit' ? 'crit' : 'warn';
+        pushLog(sev, `${label} still ${state === 'crit' ? 'CRITICAL' : 'elevated'} — ${val.toFixed(2)} ${unit}`, now);
+        anyAnomaly = true;
+      }
+    }
+
+    prevState[key] = state;
+  });
+
+  // Only log a nominal heartbeat every 15 ticks AND only if all sensors are OK
+  nominalTick++;
+  if (!anyAnomaly && nominalTick >= 15) {
+    nominalTick = 0;
+    pushLog('ok', `All sensors nominal — system operating within limits`, now);
+  }
+}
+
+function pushLog(type, msg, d) {
+  logEntries.unshift({ type, msg, time: fmtTime(d) });
+  if (logEntries.length > 8) logEntries.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const body = document.getElementById('log-body');
+  body.innerHTML = '';
+  const icons = { warn: '⚠', crit: '✕', ok: '✓' };
+  logEntries.forEach(e => {
+    const div = document.createElement('div');
+    div.className = `log-entry ${e.type}`;
+    div.innerHTML = `<span class="log-time">[${e.time}]</span><span class="log-msg ${e.type}">${icons[e.type]} ${e.msg}</span>`;
+    body.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  UPDATE DASHBOARD
+// ═══════════════════════════════════════════════════════
+function updateDashboard() {
+  if (!activeComp) return;
+  const vals = getSensorValues();
+  const c = COMPONENTS[activeComp];
+  tick++;
+
+  // Gauge values + canvas
+  const tempColor = gaugeColor(vals.temp, c.temp);
+  const presColor = gaugeColor(vals.pres, c.pres);
+  const vibColor  = gaugeColor(vals.vib,  c.vib);
+
+  drawGauge('canvas-temp', vals.temp, c.temp, tempColor);
+  drawGauge('canvas-pres', vals.pres, c.pres, presColor);
+  drawGauge('canvas-vib',  vals.vib,  c.vib,  vibColor);
+
+  setValEl('val-temp', vals.temp.toFixed(1), ' °C');
+  setValEl('val-pres', vals.pres.toFixed(2), ' bar');
+  setValEl('val-vib',  vals.vib.toFixed(2),  ' mm/s');
+
+  document.getElementById('val-temp').style.color = tempColor;
+  document.getElementById('val-pres').style.color = presColor;
+  document.getElementById('val-vib').style.color  = vibColor;
+
+  // Health
+  const score = calcHealth(vals);
+  drawHealthRing(score);
+  updateHealthLabel(score);
+
+  // Sidebar badge + dot sync
+  updateSidebarCard(activeComp, score);
+  compRisk[activeComp] = { score, level: riskLevel(score) };
+
+  // Chart
+  pushChart(vals);
+
+  // Log
+  maybeLog(vals);
+}
+
+function setValEl(id, num, unit) {
+  document.getElementById(id).innerHTML = `${num}<span class="gauge-unit">${unit}</span>`;
+}
+
+function updateHealthLabel(score) {
+  const el = document.getElementById('health-status-label');
+  el.className = 'health-status';
+  if (score >= 80) { el.textContent = 'OPTIMAL';  el.classList.add('optimal'); }
+  else if (score >= 50) { el.textContent = 'DEGRADED'; el.classList.add('degraded'); }
+  else if (score >= 25) { el.textContent = 'CRITICAL'; el.classList.add('critical'); }
+  else { el.textContent = 'FAULT'; el.classList.add('fault'); }
+}
+
+function riskLevel(score) {
+  if (score >= 80) return 'low';
+  if (score >= 55) return 'med';
+  if (score >= 30) return 'high';
+  return 'crit';
+}
+
+function riskLabel(level) {
+  return { low: 'LOW', med: 'MED', high: 'HIGH', crit: 'CRIT' }[level];
+}
+
+function updateSidebarCard(name, score) {
+  const key = name.replace(/\s/g,'-');
+  const badge = document.getElementById(`badge-${key}`);
+  const dot  = document.getElementById(`dot-${key}`);
+  if (!badge || !dot) return;
+  const level = riskLevel(score);
+  badge.className = `risk-badge ${level}`;
+  badge.textContent = riskLabel(level);
+
+  dot.className = 'status-dot';
+  if (level === 'low') dot.classList.add('ok');
+  else if (level === 'med') dot.classList.add('warn');
+  else dot.classList.add('crit');
+}
+
+// ═══════════════════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════════════════
+function updateClock() {
+  const d = new Date();
+  document.getElementById('nav-clock').textContent = d.toTimeString().slice(0,8) + ' IST';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+buildSidebar();
+</script>
+</body>
+</html>
+```

@@ -1,0 +1,46 @@
+﻿interactive rebase in progress; onto d3cfbda
+Last command done (1 command done):
+   pick 1e892be # feat: add Component Risk Monitor, light/dark mode, anomaly slider + fix Streamlit light mode sidebar
+No commands remaining.
+You are currently rebasing branch 'main' on 'd3cfbda'.
+  (fix conflicts and then run "git rebase --continue")
+  (use "git rebase --skip" to skip this patch)
+  (use "git rebase --abort" to check out the original branch)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   frontend/component_risk_monitor.html
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add/rm <file>..." as appropriate to mark resolution)
+	deleted by us:   frontend/app.py
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .gitignore
+	deleted:    README.md
+	deleted:    app.py
+	deleted:    backend/README.md
+	deleted:    backend/app.py
+	deleted:    backend/backend/__init__.py
+	deleted:    backend/backend/data_generator.py
+	deleted:    backend/backend/graph_model.py
+	deleted:    backend/backend/models.py
+	deleted:    backend/backend/topology.py
+	deleted:    backend/frontend/__init__.py
+	deleted:    backend/frontend/visualizations.py
+	deleted:    backend/requirements.txt
+	deleted:    backend/struxel-combined.html
+	deleted:    backend/struxel_app.py
+	deleted:    backend/topology.py
+	deleted:    dashboard.html
+	deleted:    struxel-combined.html
+	deleted:    struxel_app.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	st.txt
+	status.txt
+
